@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Cuaderno de Ruta — Presupuesto</title>
+<meta name="theme-color" content="#14171B" />
+<link rel="manifest" href="manifest.json" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root{
+    --bg:#14171B; --panel:#1C2025; --panel2:#20252B; --hair:#2B3038;
+    --text:#EDEFF2; --muted:#8B93A0; --amber:#F5A623; --teal:#3FA796; --rose:#D46A6A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;padding:24px 16px 60px;}
+  .wrap{max-width:820px;margin:0 auto;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--amber);margin-bottom:6px;}
+  h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:32px;margin:0;}
+  .small{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.08em;}
+  select,input,button{font-family:inherit;}
+  #monthPicker{padding:8px 10px;background:var(--panel2);border:1px solid var(--hair);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:20px;margin-bottom:16px;}
+  .panelLabel{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+  .incomeRow{display:flex;align-items:baseline;gap:8px;}
+  .euro{font-family:'Space Grotesk',sans-serif;font-size:32px;color:var(--muted);}
+  #income{background:transparent;border:none;border-bottom:2px solid var(--hair);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:600;width:100%;outline:none;padding:4px 0;}
+  .emptyRow{color:var(--muted);font-size:13px;font-style:italic;padding:8px 0;}
+  .row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--hair);border-radius:6px;padding:8px 12px;margin-bottom:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .rowName{flex:1;font-size:13px;}
+  .rowCat{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .rowAmount{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;}
+  .removeBtn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;}
+  .addRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .addRow input[type=text], .addRow select, .addRow input[list]{flex:1 1 130px;background:var(--panel2);border:1px solid var(--hair);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;}
+  .addRow input[type=number]{flex:0 1 90px;background:var(--panel2);border:1px solid var(--hair);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:'JetBrains Mono',monospace;}
+  .addBtn{background:var(--amber);color:#14171B;border:none;border-radius:6px;padding:8px 14px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;cursor:pointer;}
+  .linkBtn{background:none;border:none;color:var(--teal);font-size:12px;cursor:pointer;margin-top:10px;padding:0;font-family:'JetBrains Mono',monospace;}
+  .catGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+  .catCard{background:var(--panel2);border:1px solid var(--hair);border-radius:8px;padding:12px;}
+  .catTop{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+  .catName{font-size:12px;color:var(--muted);line-height:1.2;}
+  .catAmount{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;margin-bottom:8px;}
+  .barOuter{width:100%;height:6px;background:var(--hair);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+  .barInner{height:100%;border-radius:3px;transition:width .2s;}
+  .statusTxt{font-size:11px;font-family:'JetBrains Mono',monospace;}
+  .limitEditRow{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;}
+  .pctInput{width:46px;background:var(--bg);border:1px solid var(--hair);border-radius:4px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:3px 6px;}
+  .pctSign{font-size:11px;color:var(--muted);}
+  .errorBox{color:var(--rose);font-size:13px;font-family:'JetBrains Mono',monospace;background:rgba(212,106,106,.1);padding:10px 12px;border-radius:6px;}
+  .restanteBig{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;margin-bottom:16px;display:flex;flex-direction:column;gap:2px;}
+  .restanteSub{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;color:var(--muted);}
+  .splitGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px;}
+  .splitCard{background:var(--panel2);border:1px solid var(--hair);border-radius:8px;padding:14px;}
+  .splitLabel{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;margin-bottom:6px;}
+  .splitAmount{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;margin-bottom:6px;}
+  .splitNote{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:8px;}
+  .cashRow{display:flex;gap:24px;flex-wrap:wrap;}
+  .cashInputRow{display:flex;align-items:center;gap:4px;margin-top:4px;}
+  .cashInput{width:80px;background:var(--panel2);border:1px solid var(--hair);border-radius:6px;color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:14px;}
+  .savedFlash{margin-top:12px;color:var(--teal);font-size:12px;font-family:'JetBrains Mono',monospace;}
+  .histRow{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;}
+  .histLabel{width:90px;color:var(--muted);font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+  .histBarOuter{flex:1;background:var(--hair);border-radius:3px;overflow:hidden;height:14px;position:relative;}
+  .histBarIncome{height:100%;background:var(--amber);opacity:.35;position:absolute;left:0;top:0;}
+  .histBarRestante{height:100%;background:var(--teal);position:absolute;left:0;top:0;}
+  .histVal{width:70px;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--text);flex-shrink:0;}
+  footer{text-align:center;color:var(--muted);font-size:11px;margin-top:24px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">PRESUPUESTO MENSUAL · CONTROL DE RUTA</div>
+      <h1>Cuaderno de ruta</h1>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <label class="small">PERIODO (cobro día 5)</label>
+      <input type="month" id="monthPicker" />
+    </div>
+  </header>
+
+  <div id="storageWarning" class="errorBox" style="display:none;margin-bottom:16px;">
+    No se ha podido guardar/leer los datos en este navegador. Prueba a no usar modo incógnito.
+  </div>
+
+  <section class="panel">
+    <div class="panelLabel" id="incomeLabel">Sueldo del periodo</div>
+    <div class="incomeRow">
+      <span class="euro">€</span>
+      <input type="number" inputmode="decimal" placeholder="0" id="income" />
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panelLabel">Gastos fijos (se repiten cada periodo)</div>
+    <div id="fixedList"></div>
+    <div class="addRow">
+      <input type="text" id="fixedName" placeholder="Concepto" />
+      <select id="fixedCategory"></select>
+      <input type="number" id="fixedAmount" placeholder="€" />
+      <button class="addBtn" onclick="addFixed()">Añadir</button>
+    </div>
+    <button class="linkBtn" onclick="saveTemplate()">Guardar esta lista como mis gastos fijos habituales</button>
+  </section>
+
+  <section class="panel">
+    <div class="panelLabel">Gastos de este periodo (los vas metiendo según llegan)</div>
+    <div id="varList"></div>
+    <div class="addRow">
+      <input type="text" id="varName" placeholder="Concepto" />
+      <input list="catList" id="varCategory" placeholder="Categoría (ej. ocio)" />
+      <datalist id="catList"></datalist>
+      <input type="number" id="varAmount" placeholder="€" />
+      <button class="addBtn" onclick="addVariable()">Añadir</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panelLabel">Semáforo por área (sobre el sueldo de este periodo)</div>
+    <div class="catGrid" id="catGrid"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panelLabel">Lo que te queda y qué hacer con ello</div>
+    <div class="restanteBig" id="restanteBig"></div>
+    <div id="restanteBody"></div>
+    <div id="savedFlash" class="savedFlash" style="display:none;">Guardado ✓</div>
+  </section>
+
+  <section class="panel" id="historySection" style="display:none;">
+    <div class="panelLabel">Histórico</div>
+    <div id="histList"></div>
+  </section>
+
+  <footer>
+    Herramienta de organización personal, no asesoramiento financiero regulado. Los tipos de interés cambian — comprueba siempre la oferta vigente antes de mover dinero.
+  </footer>
+</div>
+
+<script>
+const COLORS = { amber:'#F5A623', teal:'#3FA796', rose:'#D46A6A', hair:'#2B3038', muted:'#8B93A0' };
+
+const DEFAULT_CATEGORIES = [
+  { id:'vivienda', name:'Vivienda', limitPct:35, aliases:['vivienda','alquiler','hipoteca','renta'], color:'#F5A623' },
+  { id:'suministros', name:'Suministros', limitPct:8, aliases:['suministros','luz','agua','gas','internet','telefono','telefonia'], color:'#6E8A97' },
+  { id:'alimentacion', name:'Alimentación', limitPct:15, aliases:['alimentacion','comida','super','supermercado','mercado'], color:'#7A9B5C' },
+  { id:'transporte', name:'Transporte / vehículo', limitPct:10, aliases:['transporte','gasolina','combustible','coche','parking','peaje','itv'], color:'#C9A24B' },
+  { id:'compras', name:'Compras', limitPct:8, aliases:['compras','ropa','tecnologia','amazon'], color:'#8B6BA8' },
+  { id:'ocio', name:'Ocio', limitPct:10, aliases:['ocio','restaurante','bar','cine','viaje','suscripcion','netflix','spotify'], color:'#D46A6A' },
+  { id:'salud', name:'Salud', limitPct:5, aliases:['salud','farmacia','medico','gimnasio'], color:'#5B7DB1' },
+  { id:'otros', name:'Otros', limitPct:5, aliases:['otros','varios'], color:'#9AA0A8' },
+];
+
+let categories = load('category-defs', DEFAULT_CATEGORIES);
+let cashConfig = load('cash-config', { target:300, current:0 });
+let split = load('restante-split', { ahorro:65, inversion:25, efectivo:10 });
+
+let monthKey = currentMonthKey();
+let income = '';
+let fixedExpenses = [];
+let variableExpenses = [];
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function load(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch(e){ warnStorage(); return fallback; }
+}
+function save(key, value){
+  try{ localStorage.setItem(key, JSON.stringify(value)); }
+  catch(e){ warnStorage(); }
+}
+function warnStorage(){ document.getElementById('storageWarning').style.display='block'; }
+function flashSaved(){
+  const el = document.getElementById('savedFlash');
+  el.style.display='block';
+  clearTimeout(window._flashT);
+  window._flashT = setTimeout(()=>{ el.style.display='none'; }, 1200);
+}
+
+function fmtEUR(n){
+  return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Number.isFinite(n)?n:0);
+}
+function normalize(s){
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+function matchCategory(input){
+  const n = normalize(input);
+  if(!n) return 'otros';
+  for(const c of categories){ if(normalize(c.name)===n) return c.id; }
+  for(const c of categories){ if((c.aliases||[]).some(a=>normalize(a)===n)) return c.id; }
+  for(const c of categories){ if((c.aliases||[]).some(a=> n.includes(normalize(a)) || normalize(a).includes(n))) return c.id; }
+  return 'otros';
+}
+
+function periodBounds(key){
+  const [y,m] = key.split('-').map(Number);
+  return { start: new Date(y, m-1, 5), end: new Date(y, m, 4) };
+}
+function shortDate(d){ return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }
+function monthLabel(key){
+  const {start,end} = periodBounds(key);
+  return `${shortDate(start)} – ${shortDate(end)} ${end.getFullYear()}`;
+}
+function currentMonthKey(){
+  const d = new Date();
+  const y = d.getDate()>=5 ? d.getFullYear() : (d.getMonth()===0 ? d.getFullYear()-1 : d.getFullYear());
+  const mIndex = d.getDate()>=5 ? d.getMonth() : (d.getMonth()-1+12)%12;
+  return `${y}-${String(mIndex+1).padStart(2,'0')}`;
+}
+
+function loadMonth(key){
+  const rec = load(`month:${key}`, null);
+  if(rec){
+    income = rec.income!=null ? String(rec.income) : '';
+    fixedExpenses = rec.fixedExpenses || [];
+    variableExpenses = rec.variableExpenses || [];
+    return;
+  }
+  income = '';
+  variableExpenses = [];
+  const tpl = load('fixed-template', null);
+  fixedExpenses = tpl ? tpl.map(f=>({...f, id:uid()})) : [];
+}
+function persistMonth(){
+  save(`month:${monthKey}`, { income:Number(income)||0, fixedExpenses, variableExpenses });
+  flashSaved();
+  renderHistory();
+}
+
+function addFixed(){
+  const name = document.getElementById('fixedName').value.trim();
+  const amount = Number(document.getElementById('fixedAmount').value);
+  const category = document.getElementById('fixedCategory').value;
+  if(!name || !amount) return;
+  fixedExpenses.push({ id:uid(), name, category, amount });
+  document.getElementById('fixedName').value='';
+  document.getElementById('fixedAmount').value='';
+  persistMonth(); renderAll();
+}
+function removeFixed(id){ fixedExpenses = fixedExpenses.filter(e=>e.id!==id); persistMonth(); renderAll(); }
+function saveTemplate(){ save('fixed-template', fixedExpenses); flashSaved(); }
+
+function addVariable(){
+  const name = document.getElementById('varName').value.trim();
+  const amount = Number(document.getElementById('varAmount').value);
+  const catInput = document.getElementById('varCategory').value;
+  if(!name || !amount) return;
+  const category = matchCategory(catInput || name);
+  variableExpenses.push({ id:uid(), name, category, amount, ts:Date.now() });
+  document.getElementById('varName').value='';
+  document.getElementById('varAmount').value='';
+  document.getElementById('varCategory').value='';
+  persistMonth(); renderAll();
+}
+function removeVariable(id){ variableExpenses = variableExpenses.filter(e=>e.id!==id); persistMonth(); renderAll(); }
+
+function updateCategoryLimit(id, val){
+  categories = categories.map(c=> c.id===id ? {...c, limitPct:Number(val)} : c);
+  save('category-defs', categories);
+  renderAll();
+}
+function updateCash(field, val){
+  cashConfig = {...cashConfig, [field]:Number(val)};
+  save('cash-config', cashConfig);
+  renderAll();
+}
+function updateSplit(field, val){
+  split = {...split, [field]:Number(val)};
+  save('restante-split', split);
+  renderAll();
+}
+
+function computeTotals(){
+  const byCategory = {};
+  categories.forEach(c=> byCategory[c.id]=0);
+  [...fixedExpenses, ...variableExpenses].forEach(e=>{
+    const id = byCategory.hasOwnProperty(e.category) ? e.category : 'otros';
+    byCategory[id] = (byCategory[id]||0) + (Number(e.amount)||0);
+  });
+  const fixedTotal = fixedExpenses.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const varTotal = variableExpenses.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const gastoTotal = fixedTotal + varTotal;
+  const incomeNum = Number(income)||0;
+  return { byCategory, fixedTotal, varTotal, gastoTotal, restante: incomeNum - gastoTotal, incomeNum };
+}
+
+function renderExpenseList(containerId, rows, showCat){
+  const el = document.getElementById(containerId);
+  if(!rows.length){ el.innerHTML = '<div class="emptyRow">Todavía no hay nada aquí.</div>'; return; }
+  el.innerHTML = rows.map(r=>{
+    const cat = categories.find(c=>c.id===r.category);
+    const color = cat ? cat.color : COLORS.muted;
+    const catName = showCat ? `<span class="rowCat">${cat?cat.name:'Otros'}</span>` : '';
+    return `<div class="row">
+      <span class="dot" style="background:${color}"></span>
+      <span class="rowName">${escapeHtml(r.name)}</span>
+      ${catName}
+      <span class="rowAmount">${fmtEUR(Number(r.amount))}</span>
+      <button class="removeBtn" onclick="${containerId==='fixedList'?'removeFixed':'removeVariable'}('${r.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderCategorySelects(){
+  const sel = document.getElementById('fixedCategory');
+  sel.innerHTML = categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('catList').innerHTML = categories.map(c=>`<option value="${c.name}">`).join('');
+}
+
+function renderCategoryGrid(totals){
+  const el = document.getElementById('catGrid');
+  el.innerHTML = categories.map(c=>{
+    const spent = totals.byCategory[c.id]||0;
+    const limit = totals.incomeNum * (c.limitPct/100);
+    const ratio = limit>0 ? spent/limit : 0;
+    const status = spent===0 ? 'idle' : ratio>1 ? 'over' : ratio>0.9 ? 'warn' : 'ok';
+    const statusColor = {idle:COLORS.hair, ok:COLORS.teal, warn:COLORS.amber, over:COLORS.rose}[status];
+    const statusText = {over:'TE HAS PASADO', warn:'AL LÍMITE', idle:'SIN GASTO AÚN', ok:'DENTRO DEL LÍMITE'}[status];
+    return `<div class="catCard" style="border-color:${statusColor}">
+      <div class="catTop"><span class="dot" style="background:${c.color}"></span><span class="catName">${c.name}</span></div>
+      <div class="catAmount">${fmtEUR(spent)} <span style="color:${COLORS.muted};font-size:12px;font-weight:400;">/ ${fmtEUR(limit)}</span></div>
+      <div class="barOuter"><div class="barInner" style="width:${Math.min(ratio*100,100)}%;background:${statusColor}"></div></div>
+      <div class="statusTxt" style="color:${statusColor}">${statusText}</div>
+      <div class="limitEditRow">
+        <span class="small">límite máx.</span>
+        <input class="pctInput" type="number" min="0" max="100" value="${c.limitPct}" onchange="updateCategoryLimit('${c.id}', this.value)" />
+        <span class="pctSign">% del sueldo</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRestante(totals){
+  document.getElementById('incomeLabel').textContent = `Sueldo del periodo ${monthLabel(monthKey)}`;
+  document.getElementById('restanteBig').innerHTML = `${fmtEUR(totals.restante)}
+    <span class="restanteSub">restante de ${fmtEUR(totals.incomeNum)} tras ${fmtEUR(totals.gastoTotal)} de gasto</span>`;
+
+  const body = document.getElementById('restanteBody');
+  if(totals.restante<=0){
+    body.innerHTML = `<div class="errorBox">Con el gasto que llevas metido, este periodo no queda margen — revisa las áreas en rojo arriba antes de seguir gastando.</div>`;
+    return;
+  }
+  const cashReached = cashConfig.current >= cashConfig.target && cashConfig.target>0;
+  const eff = cashReached
+    ? { ahorro: split.ahorro + split.efectivo/2, inversion: split.inversion + split.efectivo/2, efectivo: 0 }
+    : split;
+
+  body.innerHTML = `
+    <div class="splitGrid">
+      ${splitCard('Ahorro (cuenta remunerada)', eff.ahorro, totals.restante*eff.ahorro/100, 'ahorro', COLORS.teal,
+        'Tu fondo de emergencia ya está completo, así que esto hace crecer el dinero parado: compara cuentas remuneradas sin condiciones (Bankinter, Openbank, Trade Republic...) y muévelo a la que mejor tipo tenga en cada momento.', false)}
+      ${splitCard('Inversión extra', eff.inversion, totals.restante*eff.inversion/100, 'inversion', COLORS.amber,
+        'Aparte de tu aportación habitual a la cartera indexada. Puede ir a esa misma cartera como aportación extra, o a un fondo monetario si prefieres tenerlo separado.', false)}
+      ${splitCard(cashReached?'Efectivo en casa (objetivo cumplido)':'Efectivo en casa', eff.efectivo, totals.restante*eff.efectivo/100, 'efectivo', COLORS.rose,
+        cashReached ? 'Ya tienes el colchón físico objetivo. Este % se reparte entre ahorro e inversión.' : 'Colchón pequeño en casa por si falla el sistema. No hace falta que crezca sin límite, solo hasta el objetivo de abajo.', cashReached)}
+    </div>
+    <div class="cashRow">
+      <div>
+        <span class="small">YA TIENES EN EFECTIVO</span>
+        <div class="cashInputRow"><span style="color:${COLORS.muted}">€</span><input class="cashInput" type="number" value="${cashConfig.current}" onchange="updateCash('current', this.value)" /></div>
+      </div>
+      <div>
+        <span class="small">OBJETIVO</span>
+        <div class="cashInputRow"><span style="color:${COLORS.muted}">€</span><input class="cashInput" type="number" value="${cashConfig.target}" onchange="updateCash('target', this.value)" /></div>
+      </div>
+    </div>`;
+}
+function splitCard(label, pct, amount, field, color, note, disabled){
+  return `<div class="splitCard" style="opacity:${disabled?0.55:1}">
+    <div class="splitLabel" style="color:${color}">${label}</div>
+    <div class="splitAmount">${fmtEUR(amount)}</div>
+    <div class="limitEditRow">
+      <input class="pctInput" type="number" min="0" max="100" value="${Math.round(pct)}" ${disabled?'disabled':''} onchange="updateSplit('${field}', this.value)" />
+      <span class="pctSign">% del restante</span>
+    </div>
+    <div class="splitNote">${note}</div>
+  </div>`;
+}
+
+function renderHistory(){
+  const keys = Object.keys(localStorage).filter(k=>k.startsWith('month:'));
+  const items = keys.map(k=>{
+    try{
+      const p = JSON.parse(localStorage.getItem(k));
+      const fixedTotal = (p.fixedExpenses||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
+      const varTotal = (p.variableExpenses||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
+      return { key:k.replace('month:',''), income:p.income||0, restante:(p.income||0)-fixedTotal-varTotal };
+    }catch(e){ return null; }
+  }).filter(Boolean).sort((a,b)=> a.key>b.key?1:-1);
+
+  const section = document.getElementById('historySection');
+  if(!items.length){ section.style.display='none'; return; }
+  section.style.display='block';
+  const maxIncome = Math.max(...items.map(i=>i.income), 1);
+  document.getElementById('histList').innerHTML = items.map(i=>`
+    <div class="histRow">
+      <span class="histLabel">${monthLabel(i.key)}</span>
+      <div class="histBarOuter">
+        <div class="histBarIncome" style="width:${(i.income/maxIncome)*100}%"></div>
+        <div class="histBarRestante" style="width:${(Math.max(i.restante,0)/maxIncome)*100}%"></div>
+      </div>
+      <span class="histVal">${fmtEUR(i.restante)}</span>
+    </div>`).join('');
+}
+
+function renderAll(){
+  renderCategorySelects();
+  renderExpenseList('fixedList', fixedExpenses, false);
+  renderExpenseList('varList', variableExpenses, true);
+  const totals = computeTotals();
+  renderCategoryGrid(totals);
+  renderRestante(totals);
+}
+
+document.getElementById('income').addEventListener('input', (e)=>{ income = e.target.value; });
+document.getElementById('income').addEventListener('blur', ()=>{ persistMonth(); renderAll(); });
+document.getElementById('monthPicker').addEventListener('change', (e)=>{
+  monthKey = e.target.value;
+  loadMonth(monthKey);
+  document.getElementById('income').value = income;
+  renderAll();
+});
+
+// init
+document.getElementById('monthPicker').value = monthKey;
+loadMonth(monthKey);
+document.getElementById('income').value = income;
+renderAll();
+renderHistory();
+</script>
+</body>
+</html>
