@@ -121,13 +121,44 @@ function defaultData(){
   return { fixedTemplates: [], cycles: {}, knownAreas: [] };
 }
 
+// Intenta primero el almacenamiento de Claude; si no está disponible o falla,
+// usa un respaldo local en el propio navegador para no perder nada.
+async function storageGetRaw(key){
+  try{
+    if(window.storage && typeof window.storage.get === 'function'){
+      const res = await window.storage.get(key, false);
+      if(res && typeof res.value === 'string') return { value: res.value, layer:'nube' };
+    }
+  }catch(e){ /* seguimos al respaldo local */ }
+  try{
+    const v = localStorage.getItem(key);
+    if(v !== null) return { value: v, layer:'local' };
+  }catch(e){ /* respaldo local tampoco disponible */ }
+  return null;
+}
+async function storageSetRaw(key, value){
+  let cloudOk = false;
+  try{
+    if(window.storage && typeof window.storage.set === 'function'){
+      const r = await window.storage.set(key, value, false);
+      cloudOk = !!r;
+    }
+  }catch(e){ cloudOk = false; }
+  let localOk = false;
+  try{
+    localStorage.setItem(key, value);
+    localOk = true;
+  }catch(e){ localOk = false; }
+  if(cloudOk) return 'nube';
+  if(localOk) return 'local';
+  return null;
+}
+
 async function loadData(){
   let loaded = null;
-  try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if(res && res.value) loaded = JSON.parse(res.value);
-  }catch(e){
-    loaded = null; // key genuinely doesn't exist yet, or storage bridge not ready
+  const res = await storageGetRaw(STORAGE_KEY);
+  if(res){
+    try{ loaded = JSON.parse(res.value); }catch(e){ loaded = null; }
   }
   data = loaded || defaultData();
   ensureCurrentCycle();
@@ -135,13 +166,8 @@ async function loadData(){
 }
 
 async function save(){
-  try{
-    const r = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
-    saveStatus = r ? 'ok' : 'err';
-  }catch(e){
-    saveStatus = 'err';
-    console.error('storage error', e);
-  }
+  const layer = await storageSetRaw(STORAGE_KEY, JSON.stringify(data));
+  saveStatus = layer ? 'ok-'+layer : 'err';
 }
 
 function currentKey(){ return cycleStartFor(new Date()); }
@@ -252,7 +278,10 @@ function render(){
   let html = '';
 
   const statusCls = saveStatus==='err' ? 'err' : '';
-  const statusTxt = saveStatus==='err' ? 'Error al guardar' : (saveStatus==='ok' ? 'Guardado' : '');
+  const statusTxt = saveStatus==='err' ? 'Error al guardar (revisa esto)'
+    : saveStatus==='ok-nube' ? 'Guardado'
+    : saveStatus==='ok-local' ? 'Guardado en este navegador'
+    : '';
   html += '<div class="header"><h1>Presupuesto</h1><span class="save-status '+statusCls+'">'+statusTxt+'</span></div>'
     + '<div class="cycle-label">Ciclo actual: '+cycleLabel(key)+'</div>';
 
