@@ -345,7 +345,13 @@ function attachHandlers(){
   }
 
   document.querySelectorAll('.type-btn').forEach(b=>{
-    b.addEventListener('click', ()=>{ pendingType = b.dataset.type; render(); });
+    b.addEventListener('click', ()=>{
+      pendingType = b.dataset.type;
+      // Solo actualizamos el estilo de los botones, sin repintar el formulario,
+      // para no perder lo que ya se ha escrito en título/área/importe.
+      document.querySelectorAll('.type-btn').forEach(x=>x.classList.remove('selected'));
+      b.classList.add('selected');
+    });
   });
 
   const addBtn = document.getElementById('addExpenseBtn');
