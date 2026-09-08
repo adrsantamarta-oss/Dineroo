@@ -23,6 +23,8 @@ html,body{margin:0;padding:0;background:transparent;color:var(--off);font-family
 
 .header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
 .header h1{font-size:21px;margin:0;font-weight:700;}
+.save-status{font-size:10.5px;color:var(--grey);}
+.save-status.err{color:var(--red);font-weight:600;}
 .cycle-label{font-size:12px;color:var(--grey);margin-bottom:16px;}
 
 .tabs{display:flex;gap:4px;background:var(--card-2);border-radius:8px;padding:4px;margin-bottom:16px;}
@@ -67,9 +69,14 @@ html,body{margin:0;padding:0;background:transparent;color:var(--off);font-family
 
 .empty{color:var(--grey);font-size:13px;text-align:center;padding:10px 0;}
 
-.advice-card p{font-size:14px;line-height:1.55;margin:0 0 10px;}
-.advice-amt{font-size:28px;font-weight:700;color:var(--green);margin-bottom:10px;}
-.advice-note{font-size:11.5px;color:var(--grey);margin-top:10px;}
+.year-block{margin-bottom:16px;}
+.year-title{font-size:13px;color:var(--grey);font-weight:700;margin-bottom:8px;}
+.month-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;}
+.month-row .res{font-weight:700;}
+.month-row .res.green{color:var(--green);}
+.month-row .res.red{color:var(--red);}
+.month-sub{font-size:11px;color:var(--grey);}
+.year-total{display:flex;justify-content:space-between;padding-top:10px;margin-top:4px;font-size:15px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -81,6 +88,7 @@ let data = null;
 let activeTab = 'resumen';
 let expandedArea = null;
 let pendingType = 'variable';
+let saveStatus = '';
 
 function pad(n){return String(n).padStart(2,'0');}
 function fmt(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
@@ -102,22 +110,38 @@ function cycleLabel(startKey){
   const opts = {day:'numeric', month:'short'};
   return s.toLocaleDateString('es-ES',opts)+' – '+e.toLocaleDateString('es-ES',opts);
 }
+function monthLabel(startKey){
+  const s = new Date(startKey+'T00:00:00');
+  const label = s.toLocaleDateString('es-ES',{month:'long'});
+  return label.charAt(0).toUpperCase()+label.slice(1);
+}
+function yearOf(startKey){ return new Date(startKey+'T00:00:00').getFullYear(); }
 
 function defaultData(){
   return { fixedTemplates: [], cycles: {}, knownAreas: [] };
 }
 
 async function loadData(){
+  let loaded = null;
   try{
     const res = await window.storage.get(STORAGE_KEY, false);
-    data = res && res.value ? JSON.parse(res.value) : defaultData();
-  }catch(e){ data = defaultData(); }
+    if(res && res.value) loaded = JSON.parse(res.value);
+  }catch(e){
+    loaded = null; // key genuinely doesn't exist yet, or storage bridge not ready
+  }
+  data = loaded || defaultData();
   ensureCurrentCycle();
   await save();
 }
+
 async function save(){
-  try{ await window.storage.set(STORAGE_KEY, JSON.stringify(data), false); }
-  catch(e){ console.error('storage error', e); }
+  try{
+    const r = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
+    saveStatus = r ? 'ok' : 'err';
+  }catch(e){
+    saveStatus = 'err';
+    console.error('storage error', e);
+  }
 }
 
 function currentKey(){ return cycleStartFor(new Date()); }
@@ -167,37 +191,59 @@ async function addExpense(title, area, amount, type){
   render();
 }
 
-async function removeFixedTemplate(templateId, expenseId){
-  const c = cur();
-  c.expenses = c.expenses.filter(e=>e.id!==expenseId);
-  data.fixedTemplates = data.fixedTemplates.filter(t=>t.id!==templateId);
-  await save();
-  render();
-}
-
 function summaryHTML(cycle, compact){
   const spent = totalSpent(cycle);
   const salary = cycle.salary;
   let inner = '';
   if(salary===null){
-    inner = `<div class="summary-sub">Introduce el sueldo para ver cuánto te queda.</div>`;
+    inner = '<div class="summary-sub">Introduce el sueldo para ver cuánto te queda.</div>';
   } else {
     const remaining = salary - spent;
     const pct = salary>0 ? Math.round((spent/salary)*100) : 0;
     const cls = remaining>=0 ? 'green' : 'red';
     const label = remaining>=0 ? 'Te quedan' : 'Te has pasado';
-    inner = `<div class="summary-line">
-        <div>
-          <div class="summary-sub">${label}</div>
-          <div class="amt ${cls} num">${euros(Math.abs(remaining))}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="summary-sub">Gastado</div>
-          <div class="amt num" style="font-size:${compact?18:20}px;color:var(--grey)">${euros(spent)} · ${pct}%</div>
-        </div>
-      </div>`;
+    inner = '<div class="summary-line">'
+        + '<div><div class="summary-sub">'+label+'</div>'
+        + '<div class="amt '+cls+' num">'+euros(Math.abs(remaining))+'</div></div>'
+        + '<div style="text-align:right"><div class="summary-sub">Gastado</div>'
+        + '<div class="amt num" style="font-size:'+(compact?18:20)+'px;color:var(--grey)">'+euros(spent)+' · '+pct+'%</div></div>'
+        + '</div>';
   }
   return inner;
+}
+
+function renderAnual(){
+  const keys = Object.keys(data.cycles).sort();
+  if(keys.length===0) return '<div class="card"><div class="empty">Todavía no hay datos de ningún mes.</div></div>';
+  const byYear = {};
+  keys.forEach(k=>{
+    const y = yearOf(k);
+    if(!byYear[y]) byYear[y] = [];
+    byYear[y].push(k);
+  });
+  const years = Object.keys(byYear).sort((a,b)=>b-a);
+  let html = '';
+  years.forEach(y=>{
+    const monthKeys = byYear[y].slice().sort((a,b)=> a<b?1:-1);
+    let yearTotal = 0;
+    let rows = '';
+    monthKeys.forEach(k=>{
+      const c = data.cycles[k];
+      const spent = totalSpent(c);
+      const salary = c.salary;
+      const result = salary!==null ? salary - spent : null;
+      if(result!==null) yearTotal += result;
+      const cls = result===null ? '' : (result>=0?'green':'red');
+      const resText = result===null ? 'sin sueldo' : euros(result);
+      rows += '<div class="month-row"><div><div>'+monthLabel(k)+'</div>'
+        + '<div class="month-sub">Ingreso: '+(salary!==null?euros(salary):'—')+' · Gasto: '+euros(spent)+'</div></div>'
+        + '<div class="res '+cls+' num">'+resText+'</div></div>';
+    });
+    const totalCls = yearTotal>=0 ? 'green' : 'red';
+    html += '<div class="card year-block"><h2>'+y+'</h2>'+rows
+      + '<div class="year-total"><span>Total del año</span><span class="'+totalCls+' num">'+euros(yearTotal)+'</span></div></div>';
+  });
+  return html;
 }
 
 function render(){
@@ -205,83 +251,54 @@ function render(){
   const key = currentKey();
   let html = '';
 
-  html += `<div class="header"><h1>Presupuesto</h1></div>
-  <div class="cycle-label">Ciclo actual: ${cycleLabel(key)}</div>`;
+  const statusCls = saveStatus==='err' ? 'err' : '';
+  const statusTxt = saveStatus==='err' ? 'Error al guardar' : (saveStatus==='ok' ? 'Guardado' : '');
+  html += '<div class="header"><h1>Presupuesto</h1><span class="save-status '+statusCls+'">'+statusTxt+'</span></div>'
+    + '<div class="cycle-label">Ciclo actual: '+cycleLabel(key)+'</div>';
 
-  html += `<div class="tabs">
-    <button class="tab-btn ${activeTab==='resumen'?'active':''}" data-tab="resumen">Resumen</button>
-    <button class="tab-btn ${activeTab==='sobrante'?'active':''}" data-tab="sobrante">Sobrante</button>
-  </div>`;
+  html += '<div class="tabs">'
+    + '<button class="tab-btn '+(activeTab==='resumen'?'active':'')+'" data-tab="resumen">Resumen</button>'
+    + '<button class="tab-btn '+(activeTab==='anual'?'active':'')+'" data-tab="anual">Resumen anual</button>'
+    + '</div>';
 
   if(activeTab==='resumen'){
-    html += `<div class="card">
-      <h2>Sueldo de este ciclo</h2>
-      <div class="salary-row">
-        <span>€</span>
-        <input class="salary-input num" type="number" inputmode="decimal" id="salaryInput" placeholder="0" value="${c.salary!==null?c.salary:''}">
-      </div>
-      <div class="summary-top">${summaryHTML(c,false)}</div>
-    </div>`;
+    html += '<div class="card"><h2>Sueldo de este ciclo</h2>'
+      + '<div class="salary-row"><span>€</span>'
+      + '<input class="salary-input num" type="number" inputmode="decimal" id="salaryInput" placeholder="0" value="'+(c.salary!==null?c.salary:'')+'"></div>'
+      + '<div class="summary-top">'+summaryHTML(c,false)+'</div></div>';
 
-    html += `<div class="card">
-      <h2>Añadir gasto</h2>
-      <div class="form-grid">
-        <input type="text" id="titleInput" placeholder="Título (ej: gasolina)">
-        <input type="text" id="areaInput" list="areaList" placeholder="Área (ej: vivienda, ocio...)">
-        <datalist id="areaList">${data.knownAreas.map(a=>`<option value="${a}">`).join('')}</datalist>
-        <input type="number" id="amountInput" inputmode="decimal" placeholder="Importe en €">
-        <div class="type-toggle">
-          <button type="button" class="type-btn ${pendingType==='variable'?'selected':''}" data-type="variable">Variable</button>
-          <button type="button" class="type-btn ${pendingType==='fijo'?'selected':''}" data-type="fijo">Fijo (se repite cada mes)</button>
-        </div>
-        <button class="add-btn" id="addExpenseBtn">Añadir a la ruta del mes</button>
-      </div>
-    </div>`;
+    html += '<div class="card"><h2>Añadir gasto</h2><div class="form-grid">'
+      + '<input type="text" id="titleInput" placeholder="Título (ej: gasolina)">'
+      + '<input type="text" id="areaInput" list="areaList" placeholder="Área (ej: vivienda, ocio...)">'
+      + '<datalist id="areaList">'+data.knownAreas.map(a=>'<option value="'+a+'">').join('')+'</datalist>'
+      + '<input type="number" id="amountInput" inputmode="decimal" placeholder="Importe en €">'
+      + '<div class="type-toggle">'
+      + '<button type="button" class="type-btn '+(pendingType==='variable'?'selected':'')+'" data-type="variable">Variable</button>'
+      + '<button type="button" class="type-btn '+(pendingType==='fijo'?'selected':'')+'" data-type="fijo">Fijo (se repite cada mes)</button>'
+      + '</div><button class="add-btn" id="addExpenseBtn">Añadir gasto</button></div></div>';
 
     const groups = areaGroups(c);
-    html += `<div class="card"><h2>Áreas de gasto</h2>`;
+    html += '<div class="card"><h2>Áreas de gasto</h2>';
     if(groups.length===0){
-      html += `<div class="empty">Todavía no has añadido ningún gasto este ciclo.</div>`;
+      html += '<div class="empty">Todavía no has añadido ningún gasto este ciclo.</div>';
     } else {
       groups.forEach(g=>{
         const pct = c.salary ? Math.round((g.total/c.salary)*100) : null;
         const open = expandedArea === g.area;
-        html += `<div class="area-card">
-          <div class="area-head" data-area="${g.area}">
-            <div>
-              <div class="area-name">${g.area}</div>
-              <div class="area-pct">${pct!==null ? pct+'% del sueldo' : ''}</div>
-            </div>
-            <div class="area-amt num">${euros(g.total)}</div>
-          </div>
-          <div class="area-detail ${open?'open':''}">
-            ${g.items.map(it=>`<div class="expense-row">
-              <span class="et">${it.title}<span class="tag ${it.type}">${it.type}</span></span>
-              <span class="num">${euros(it.amount)}</span>
-            </div>`).join('')}
-          </div>
-        </div>`;
+        html += '<div class="area-card"><div class="area-head" data-area="'+g.area+'">'
+          + '<div><div class="area-name">'+g.area+'</div>'
+          + '<div class="area-pct">'+(pct!==null ? pct+'% del sueldo' : '')+'</div></div>'
+          + '<div class="area-amt num">'+euros(g.total)+'</div></div>'
+          + '<div class="area-detail '+(open?'open':'')+'">'
+          + g.items.map(it=>'<div class="expense-row"><span class="et">'+it.title+'<span class="tag '+it.type+'">'+it.type+'</span></span><span class="num">'+euros(it.amount)+'</span></div>').join('')
+          + '</div></div>';
       });
     }
-    html += `</div>`;
+    html += '</div>';
 
-    html += `<div class="card bottom-summary"><h2>Total del ciclo</h2>${summaryHTML(c,true)}</div>`;
+    html += '<div class="card bottom-summary"><h2>Total del ciclo</h2>'+summaryHTML(c,true)+'</div>';
   } else {
-    const spent = totalSpent(c);
-    const salary = c.salary;
-    const remaining = salary!==null ? salary - spent : null;
-    html += `<div class="card advice-card">`;
-    if(salary===null){
-      html += `<p>Introduce el sueldo en la pestaña Resumen para calcular si te sobra algo este ciclo.</p>`;
-    } else if(remaining<=0){
-      html += `<p>Este ciclo no te sobra nada${remaining<0?` — te has pasado ${euros(Math.abs(remaining))}`:''}. Nada que repartir por ahora.</p>`;
-    } else {
-      html += `<div class="advice-amt num">${euros(remaining)} de sobrante</div>
-        <p>Ya tienes el fondo de emergencia completo, así que este dinero puede ir directo a hacer crecer tu colchón productivo en vez de quedarse parado.</p>
-        <p>Con tu perfil moderado, una forma razonable de repartirlo: una parte a tu cartera indexada como aportación extra, y el resto a la cuenta remuneraba o fondo monetario que usas para el ahorro líquido — así no todo queda ilíquido pero tampoco pierde rentabilidad frente a la inflación.</p>
-        <p class="advice-note">Esto es solo una orientación general, no asesoramiento financiero — la decisión final y el reparto exacto son tuyos.</p>`;
-    }
-    html += `</div>`;
+    html += renderAnual();
   }
 
   document.getElementById('app').innerHTML = html;
