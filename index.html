@@ -60,8 +60,10 @@ html,body{margin:0;padding:0;background:transparent;color:var(--off);font-family
 .area-amt{font-size:16px;font-weight:700;}
 .area-detail{display:none;margin-top:10px;padding-left:2px;}
 .area-detail.open{display:block;}
-.expense-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--grey);border-top:1px solid var(--border);}
+.expense-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;padding:8px 0;color:var(--grey);border-top:1px solid var(--border);}
 .expense-row .et{color:var(--off);}
+.exp-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.del-btn{background:none;border:1px solid var(--border);color:var(--red);font-size:10.5px;padding:4px 7px;border-radius:5px;cursor:pointer;font-family:inherit;}
 .tag{font-size:9.5px;padding:2px 6px;border-radius:4px;margin-left:6px;background:var(--card-2);color:var(--grey);}
 .tag.fijo{color:var(--accent);}
 
@@ -208,11 +210,24 @@ async function addExpense(title, area, amount, type){
   if(!title.trim() || !area.trim() || isNaN(amount) || amount<=0) return;
   const c = cur();
   const id = 'e-'+Date.now();
-  c.expenses.push({ id, title:title.trim(), area:area.trim(), amount, type });
+  let templateId = null;
   if(type==='fijo'){
-    data.fixedTemplates.push({ id:'ft-'+Date.now(), title:title.trim(), area:area.trim(), amount });
+    templateId = 'ft-'+Date.now();
+    data.fixedTemplates.push({ id:templateId, title:title.trim(), area:area.trim(), amount });
   }
+  c.expenses.push({ id, title:title.trim(), area:area.trim(), amount, type, templateId });
   if(!data.knownAreas.includes(area.trim())) data.knownAreas.push(area.trim());
+  await save();
+  render();
+}
+
+async function removeExpense(expenseId, alsoStopRecurring){
+  const c = cur();
+  const exp = c.expenses.find(e=>e.id===expenseId);
+  c.expenses = c.expenses.filter(e=>e.id!==expenseId);
+  if(alsoStopRecurring && exp && exp.templateId){
+    data.fixedTemplates = data.fixedTemplates.filter(t=>t.id!==exp.templateId);
+  }
   await save();
   render();
 }
@@ -319,7 +334,12 @@ function render(){
           + '<div class="area-pct">'+(pct!==null ? pct+'% del sueldo' : '')+'</div></div>'
           + '<div class="area-amt num">'+euros(g.total)+'</div></div>'
           + '<div class="area-detail '+(open?'open':'')+'">'
-          + g.items.map(it=>'<div class="expense-row"><span class="et">'+it.title+'<span class="tag '+it.type+'">'+it.type+'</span></span><span class="num">'+euros(it.amount)+'</span></div>').join('')
+          + g.items.map(it=>'<div class="expense-row"><span class="et">'+it.title+'<span class="tag '+it.type+'">'+it.type+'</span></span>'
+            + '<span class="exp-right"><span class="num">'+euros(it.amount)+'</span>'
+            + (it.type==='fijo'
+                ? '<button class="del-btn" data-del="'+it.id+'" data-stop="0">Quitar aquí</button><button class="del-btn" data-del="'+it.id+'" data-stop="1">No repetir más</button>'
+                : '<button class="del-btn" data-del="'+it.id+'" data-stop="0">Eliminar</button>')
+            + '</span></div>').join('')
           + '</div></div>';
       });
     }
@@ -369,6 +389,13 @@ function attachHandlers(){
       const a = h.dataset.area;
       expandedArea = expandedArea===a ? null : a;
       render();
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(b=>{
+    b.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      removeExpense(b.dataset.del, b.dataset.stop==='1');
     });
   });
 }
